@@ -1,10 +1,13 @@
 import networkx as nx
+from networkx.algorithms.traversal import dfs_tree
+
 from database.dao import DAO
 
 
 class Model:
     def __init__(self):
         self.G = nx.Graph()
+        self.rifugio_dict = {}
 
     def build_graph(self, year: int):
         """
@@ -14,6 +17,16 @@ class Model:
         :param year: anno limite fino al quale selezionare le connessioni da includere.
         """
         # TODO
+        self.G.clear()
+        rifugi = DAO.read_rifugi()
+        self.rifugio_dict = {rifugio.id: rifugio for rifugio in rifugi} # creo il dizionario dei rifugi da usare in seguito
+        sentieri = DAO.read_sentieri()
+        for sentiero in sentieri:
+            if sentiero.anno <= year:
+                rifugio1 = self.rifugio_dict[sentiero.id_rifugio1]
+                rifugio2 = self.rifugio_dict[sentiero.id_rifugio2] # prendo dal dizionario i due rifugi di un sentiero adatto
+                self.G.add_edge(rifugio1, rifugio2)  # creo un nodo tra rifugio 1 e 2
+
 
     def get_nodes(self):
         """
@@ -21,6 +34,7 @@ class Model:
         :return: lista dei rifugi presenti nel grafo.
         """
         # TODO
+        return list(self.G.nodes)   # ogni nodo è un oggetto rifugio
 
     def get_num_neighbors(self, node):
         """
@@ -29,6 +43,8 @@ class Model:
         :return: numero di vicini diretti del nodo indicato
         """
         # TODO
+        vicini = list(self.G.neighbors(node))  # lista di vicini di un nodo
+        return len(vicini)
 
     def get_num_connected_components(self):
         """
@@ -36,6 +52,7 @@ class Model:
         :return: numero di componenti connesse
         """
         # TODO
+        return nx.number_connected_components(self.G) # dà il numero di componenti connesse del grafo
 
     def get_reachable(self, start):
         """
@@ -55,3 +72,25 @@ class Model:
         """
 
         # TODO
+        percorso_dfs = self.get_reachable_dfs_tree(start)
+        percorso_ricorsivo = self.get_reachable_ricorsivo(start)
+        return percorso_dfs
+
+    def get_reachable_dfs_tree(self, start):
+        collegati = nx.dfs_tree(self.G, start)  # creo un grafo con solo i nodi raggiungibili a partire da start
+        raggiungibili = list(collegati.nodes) # li metto in lista
+        raggiungibili.remove(start) # tolgo start
+        return raggiungibili
+
+    def get_reachable_ricorsivo(self, start):
+        visitati = set()  # insieme dei rifugi ancora da visitare
+        self._ricorsione(start, visitati) # chiamo la ricorsione
+        visitati.remove(start)  # tolgo start(richiesto da consegna)
+        return visitati
+
+    def _ricorsione(self, nodo, visitati):
+        visitati.add(nodo) # aggiungo il rifugio attuale
+        for vicino in self.G.neighbors(nodo):
+            if vicino not in visitati:
+                self._ricorsione(vicino, visitati)  # per ogni vicino che non è già stato visitato richiamo la ricorsione
+
